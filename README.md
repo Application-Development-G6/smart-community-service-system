@@ -1,2 +1,2 @@
-# AppDev
-Application development project repository for Group 6.
+# SmartCommunityServiceAndComplaintSystem
+A system for reporting community issues, tracking complaints, and managing community concerns.
