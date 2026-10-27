@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Community Complaints</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--tx:#1d2420;--mut:#66706a;--line:#dedbd2;--ac:#1f6b4f;--acx:#fff;--in:#fff;
+--s-new:#b45309;--s-review:#1d4ed8;--s-prog:#7c3aed;--s-res:#15803d;--s-rej:#6b7280;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#151a17;--card:#1e2521;--tx:#e8ece9;--mut:#98a39c;--line:#334039;--ac:#4cc38f;--acx:#07140e;--in:#151a17;
+--s-new:#fbbf24;--s-review:#7aa2ff;--s-prog:#b79bff;--s-res:#4ade80;--s-rej:#9ca3af}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#151a17;--card:#1e2521;--tx:#e8ece9;--mut:#98a39c;--line:#334039;--ac:#4cc38f;--acx:#07140e;--in:#151a17;--s-new:#fbbf24;--s-review:#7aa2ff;--s-prog:#b79bff;--s-res:#4ade80;--s-rej:#9ca3af}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:16px}
+h1{font:600 22px/1.2 Georgia,serif;margin:0}
+.role{font-size:12px;color:var(--mut)}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+button,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:8px}
+button.on,button.primary{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+button:disabled{opacity:.5;cursor:default}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+input,select,textarea{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--in);color:var(--tx)}
+textarea{min-height:110px;resize:vertical}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media (max-width:640px){.grid{grid-template-columns:1fr}}
+.hint{font-size:12px;color:var(--mut);margin-top:4px}
+.err{color:#c2410c;font-size:13px;margin-top:8px}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid currentColor}
+.st-New{color:var(--s-new)}.st-Under\ Review{color:var(--s-review)}.st-In\ Progress{color:var(--s-prog)}.st-Resolved{color:var(--s-res)}.st-Rejected{color:var(--s-rej)}
+.row{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.row:first-child{border-top:0}
+.row:hover .t{text-decoration:underline}
+.t{font-weight:600}.meta{font-size:12px;color:var(--mut)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{font-size:22px;display:block}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.filters>*{width:auto;flex:1 1 150px}
+.tl{border-left:2px solid var(--line);margin:10px 0 0 6px;padding-left:14px}
+.tl div{margin-bottom:10px;font-size:13px}
+.ok{background:var(--card);border:1px solid var(--ac);border-radius:12px;padding:18px}
+.ok code{font-size:18px;font-weight:700;color:var(--ac)}
+.empty{color:var(--mut);padding:18px 0;text-align:center}
+.pri-Urgent{color:#dc2626;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>Community Complaints</h1><div class="role" id="role">Loading…</div></div>
+  <button id="asRes" hidden></button>
+</header>
+<nav id="nav"></nav>
+<main id="main"></main>
+</div>
+<script>
+const STATUSES=["New","Under Review","In Progress","Resolved","Rejected"];
+const CATS=["Noise","Garbage / Sanitation","Road / Infrastructure","Water / Drainage","Street Lighting","Safety / Security","Neighbor Dispute","Public Facilities","Other"];
+const PRIS=["Low","Normal","Urgent"];
+let db=null,me="",isStaff=false,asResident=false,tab="submit",complaints=[],statuses={},openId=null,flash=null,lookupRef="",filt={s:"",c:"",q:""};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=t=>new Date(t).toLocaleString([], {dateStyle:"medium",timeStyle:"short"});
+const staffView=()=>isStaff&&!asResident;
+const stOf=c=>(statuses[c.id]||{status:"New",history:[]});
+const badge=s=>`<span class="badge st-${esc(s)}">${esc(s)}</span>`;
+
+async function init(){
+  render();
+  try{
+    const user=await claude.use("user");
+    isStaff=!!(user&&user.canEdit());
+    if(user){try{me=await user.id()}catch(e){}}
+  }catch(e){}
+  try{db=await claude.use("db")}catch(e){db=null}
+  if(!me){me=localStorage.getItem("cmp_anon")||("anon"+Math.random().toString(36).slice(2,10));try{localStorage.setItem("cmp_anon",me)}catch(e){}}
+  if(staffView())tab="manage";
+  if(db){
+    db.collection("complaints").onSnapshot(s=>{complaints=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.createdAt-a.createdAt);render()},e=>console.error(e));
+    db.collection("statuses").onSnapshot(s=>{statuses={};s.docs.forEach(d=>statuses[d.id]=d.data());render()},e=>console.error(e));
+  }
+  render();
+}
+
+function render(){
+  const sv=staffView();
+  $("#role").textContent=!db?"Database unavailable — sign in to use this module":sv?"Signed in as authorized personnel":"Signed in as community member";
+  const b=$("#asRes");b.hidden=!isStaff;b.textContent=asResident?"Back to staff view":"Preview as resident";
+  b.onclick=()=>{asResident=!asResident;tab=asResident?"submit":"manage";openId=null;render()};
+  const tabs=[["submit","Submit a complaint"],["mine","Track my complaints"]];
+  if(sv)tabs.push(["manage","Staff dashboard"]);
+  $("#nav").innerHTML=tabs.map(([k,l])=>`<button class="${tab===k?"on":""}" data-t="${k}">${l}</button>`).join("");
+  $("#nav").querySelectorAll("button").forEach(x=>x.onclick=()=>{tab=x.dataset.t;openId=null;flash=null;render()});
+  if(tab==="manage"&&sv)return renderManage();
+  if(tab==="mine")return renderMine();
+  renderForm();
+}
+
+function renderForm(){
+  if(flash){
+    $("#main").innerHTML=`<div class="ok"><p>Thank you. Your complaint was submitted. Keep this reference number to track it:</p><p><code>${esc(flash)}</code></p><button class="primary" id="again">Submit another</button></div>`;
+    $("#again").onclick=()=>{flash=null;render()};return;
+  }
+  $("#main").innerHTML=`<div class="card"><form id="f" onsubmit="return false">
+  <div class="grid">
+   <div><label>Full name</label><input id="name" maxlength="80" placeholder="Leave blank to stay anonymous"></div>
+   <div><label>Contact (phone or email)</label><input id="contact" maxlength="80" placeholder="So staff can follow up"></div>
+   <div><label>Category *</label><select id="cat">${CATS.map(c=>`<option>${c}</option>`).join("")}</select></div>
+   <div><label>Priority</label><select id="pri">${PRIS.map(c=>`<option ${c==="Normal"?"selected":""}>${c}</option>`).join("")}</select></div>
+   <div><label>Location / address *</label><input id="loc" maxlength="140" placeholder="Street, purok, landmark"></div>
+   <div><label>Date it happened</label><input id="when" type="date"></div>
+  </div>
+  <label>Subject *</label><input id="subj" maxlength="100" placeholder="Short summary">
+  <label>Description *</label><textarea id="desc" maxlength="2000" placeholder="What happened? Who is affected? Any details that help."></textarea>
+  <div class="hint">Fields marked * are required.</div>
+  <div class="err" id="err"></div>
+  <p><button class="primary" id="go">Submit complaint</button></p>
+  </form></div>`;
+  $("#go").onclick=submit;
+}
+
+async function submit(){
+  const v=id=>$("#"+id).value.trim();
+  const e=[];
+  if(v("subj").length<5)e.push("Please enter a subject (at least 5 characters).");
+  if(!v("loc"))e.push("Location is required.");
+  if(v("desc").length<20)e.push("Please describe the issue in at least 20 characters.");
+  if(v("contact")&&!/^[\w.+-]+@[\w-]+\.[\w.]+$|^[+\d][\d\s()-]{6,}$/.test(v("contact")))e.push("Contact must be a valid email or phone number.");
+  if(!db)e.push("Database is unavailable. Please sign in and reload.");
+  if(e.length){$("#err").innerHTML=e.map(esc).join("<br>");return}
+  $("#go").disabled=true;
+  const now=Date.now(),d=new Date(now);
+  const ref="CMP-"+d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+"-"+Math.random().toString(36).slice(2,7).toUpperCase();
+  try{
+    await db.collection("complaints").doc(ref).set({ref,name:v("name")||"Anonymous",contact:v("contact"),category:v("cat"),priority:v("pri"),location:v("loc"),incidentDate:v("when"),subject:v("subj"),description:v("desc"),submittedBy:me,createdAt:now});
+    flash=ref;render();
+  }catch(x){$("#go").disabled=false;$("#err").textContent="Could not submit: "+(x.message||x.code||"unknown error")}
+}
+
+function listHTML(list,showWho){
+  if(!list.length)return `<div class="empty">No complaints to show.</div>`;
+  return list.map(c=>`<div class="row" data-id="${esc(c.id)}"><div><div class="t">${esc(c.subject)}</div>
+  <div class="meta">${esc(c.ref)} · ${esc(c.category)} · ${fmt(c.createdAt)}${showWho?" · "+esc(c.name):""}${c.priority==="Urgent"?' · <span class="pri-Urgent">Urgent</span>':""}</div></div>${badge(stOf(c).status)}</div>`).join("");
+}
+function bindRows(){document.querySelectorAll(".row").forEach(r=>r.onclick=()=>{openId=r.dataset.id;render()})}
+
+function detailHTML(c,staff){
+  const s=stOf(c),h=(s.history||[]).slice().reverse();
+  return `<div class="card"><button id="back">← Back</button>
+  <h2 style="margin:12px 0 4px;font:600 20px Georgia,serif">${esc(c.subject)}</h2>
+  <div class="meta">${esc(c.ref)} · ${badge(s.status)}</div>
+  <p style="white-space:pre-wrap">${esc(c.description)}</p>
+  <div class="grid meta" style="font-size:13px">
+   <div><b>Category:</b> ${esc(c.category)}</div><div><b>Priority:</b> ${esc(c.priority)}</div>
+   <div><b>Location:</b> ${esc(c.location)}</div><div><b>Incident date:</b> ${esc(c.incidentDate||"—")}</div>
+   <div><b>Submitted:</b> ${fmt(c.createdAt)}</div>
+   ${staff?`<div><b>Complainant:</b> ${esc(c.name)}</div><div><b>Contact:</b> ${esc(c.contact||"—")}</div>`:""}
+  </div>
+  ${staff?`<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+  <label>Update status</label><select id="ns">${STATUSES.map(x=>`<option ${x===s.status?"selected":""}>${x}</option>`).join("")}</select>
+  <label>Note to complainant / internal log</label><textarea id="nn" style="min-height:70px" maxlength="500" placeholder="e.g. Crew scheduled for Friday"></textarea>
+  <div class="err" id="err"></div><p><button class="primary" id="save">Save update</button></p>`:""}
+  <b style="font-size:13px">Status history</b>
+  <div class="tl">${h.map(x=>`<div><b>${esc(x.status)}</b> · ${fmt(x.at)}${x.note?"<br>"+esc(x.note):""}</div>`).join("")}<div><b>Submitted</b> · ${fmt(c.createdAt)}</div></div></div>`;
+}
+
+function renderDetail(staff){
+  const c=complaints.find(x=>x.id===openId);
+  if(!c){openId=null;return render()}
+  $("#main").innerHTML=detailHTML(c,staff);
+  $("#back").onclick=()=>{openId=null;render()};
+  if(staff)$("#save").onclick=async()=>{
+    const s=stOf(c),status=$("#ns").value,note=$("#nn").value.trim();
+    if(status===s.status&&!note){$("#err").textContent="Change the status or add a note.";return}
+    $("#save").disabled=true;
+    const history=[...(s.history||[]),{status,note,at:Date.now(),by:me}];
+    try{await db.collection("statuses").doc(c.id).set({status,history,updatedAt:Date.now()})}
+    catch(x){$("#save").disabled=false;$("#err").textContent="Update failed: "+(x.message||x.code)}
+  };
+}
+
+function renderMine(){
+  if(openId)return renderDetail(false);
+  const mine=complaints.filter(c=>c.submittedBy===me);
+  const found=lookupRef?complaints.find(c=>c.ref===lookupRef.trim().toUpperCase()):null;
+  $("#main").innerHTML=`<div class="card"><b>Look up by reference number</b>
+  <div style="display:flex;gap:8px;margin-top:8px"><input id="lk" placeholder="CMP-202610-ABCDE" value="${esc(lookupRef)}"><button id="lkb">Find</button></div>
+  ${lookupRef&&!found?'<div class="err">No complaint found with that reference.</div>':""}
+  ${found?listHTML([found],false):""}</div>
+  <div class="card"><b>My submissions</b>${listHTML(mine,false)}</div>`;
+  $("#lkb").onclick=()=>{lookupRef=$("#lk").value;render()};
+  bindRows();
+}
+
+function renderManage(){
+  if(openId)return renderDetail(true);
+  const cnt={};STATUSES.forEach(s=>cnt[s]=0);complaints.forEach(c=>cnt[stOf(c).status]++);
+  const q=filt.q.toLowerCase();
+  const list=complaints.filter(c=>(!filt.s||stOf(c).status===filt.s)&&(!filt.c||c.category===filt.c)&&(!q||(c.subject+c.ref+c.location+c.name+c.description).toLowerCase().includes(q)));
+  $("#main").innerHTML=`<div class="stats"><div class="stat"><b>${complaints.length}</b>Total</div>${STATUSES.map(s=>`<div class="stat"><b class="st-${s}">${cnt[s]}</b>${s}</div>`).join("")}</div>
+  <div class="card"><div class="filters">
+   <input id="q" placeholder="Search…" value="${esc(filt.q)}">
+   <select id="fs"><option value="">All statuses</option>${STATUSES.map(s=>`<option ${filt.s===s?"selected":""}>${s}</option>`).join("")}</select>
+   <select id="fc"><option value="">All categories</option>${CATS.map(s=>`<option ${filt.c===s?"selected":""}>${s}</option>`).join("")}</select></div>
+   ${listHTML(list,true)}</div>`;
+  $("#fs").onchange=e=>{filt.s=e.target.value;render()};
+  $("#fc").onchange=e=>{filt.c=e.target.value;render()};
+  const qi=$("#q");qi.onchange=()=>{filt.q=qi.value;render()};
+  bindRows();
+}
+init();
+</script>
+</body>
+</html>
