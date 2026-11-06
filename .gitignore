@@ -1,4 +1,10 @@
-
 .env
 node_modules/
 desktop.ini
+
+# Uploaded complaint images
+uploads/*
+!uploads/.gitkeep
+
+# Backup files
+index-backup.html

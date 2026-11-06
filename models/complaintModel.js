@@ -1,12 +1,11 @@
-
 const db = require('../db');
 
 // Save a complaint using a MySQL stored procedure
-function createComplaint(title, category, description, location) {
+function createComplaint(title, category, description, location, userId, photoUrl) {
     return new Promise((resolve, reject) => {
         db.query(
-            'CALL sp_create_complaint(?, ?, ?, ?)',
-            [title, category, description, location],
+            'CALL sp_create_complaint(?, ?, ?, ?, ?, ?)',
+            [title, category, description, location, userId, photoUrl],
             (err, results) => {
                 if (err) {
                     return reject(err);
@@ -47,7 +46,6 @@ function updateComplaintStatus(id, status) {
 
                 console.log('Stored procedure results:', results);
 
-                // MySQL returns a ResultSetHeader directly in this case.
                 const affectedRows = results?.affectedRows;
 
                 if (typeof affectedRows !== 'number') {

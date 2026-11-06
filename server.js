@@ -18,8 +18,11 @@ const verifyToken = require('./middleware/authMiddleware');
 
 app.use(express.json());
 
-// Serve frontend assets from the public folder only
+// Serve frontend assets from the public folder
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve uploaded complaint images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Home page
 app.get('/', (req, res) => {
