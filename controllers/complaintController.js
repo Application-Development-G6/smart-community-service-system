@@ -1,9 +1,31 @@
 
 const complaintModel = require('../models/complaintModel');
+const fs = require('fs');
+
+function removeUploadedPhoto(file) {
+    if (!file) {
+        return;
+    }
+
+    fs.unlink(file.path, (err) => {
+        if (err && err.code !== 'ENOENT') {
+            console.error('Failed to remove uploaded complaint photo:', err.message);
+        }
+    });
+}
 
 // Handle complaint submission
 async function createComplaint(req, res) {
     const { title, category, description, location } = req.body || {};
+    const userId = Number(req.user && req.user.id);
+
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+        removeUploadedPhoto(req.file);
+        return res.status(401).json({
+            success: false,
+            message: 'Authenticated user information is missing.'
+        });
+    }
 
     if (
         typeof title !== 'string' || !title.trim() ||
@@ -11,6 +33,7 @@ async function createComplaint(req, res) {
         typeof description !== 'string' || !description.trim() ||
         typeof location !== 'string' || !location.trim()
     ) {
+        removeUploadedPhoto(req.file);
         return res.status(400).json({
             success: false,
             message: 'Please provide all required complaint details.'
@@ -18,19 +41,33 @@ async function createComplaint(req, res) {
     }
 
     try {
+        const photoUrl = req.file
+            ? `/uploads/${req.file.filename}`
+            : null;
+
         const result = await complaintModel.createComplaint(
             title.trim(),
             category.trim(),
             description.trim(),
-            location.trim()
+            location.trim(),
+            userId,
+            photoUrl
         );
+
+        if (!result || result.complaintId == null) {
+            throw new Error('The create complaint procedure returned no reference number.');
+        }
 
         return res.status(201).json({
             success: true,
             message: 'Complaint submitted successfully!',
-            complaintId: result.complaintId
+            complaintId: result.complaintId,
+            referenceNumber: result.complaintId,
+            photoUrl
         });
+
     } catch (err) {
+        removeUploadedPhoto(req.file);
         console.error('Create complaint error:', err.message);
 
         return res.status(500).json({
@@ -83,11 +120,6 @@ async function updateComplaintStatus(req, res) {
     try {
         const affectedRows =
             await complaintModel.updateComplaintStatus(id, status);
-
-        console.log(
-            'Affected rows received by controller:',
-            affectedRows
-        );
 
         if (affectedRows === 0) {
             return res.status(404).json({

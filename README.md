@@ -54,3 +54,31 @@ Initial project setup and development are in progress. Features will be implemen
 ## Collaboration
 
 GitHub is used for source-code management, task tracking, code reviews, and team collaboration. Team members should work on assigned branches and submit pull requests for review before changes are merged into protected branches.
+
+## Complaint API
+
+#### Import the database scripts with phpMyAdmin
+
+1. In phpMyAdmin, open **Import** from the server or select the `smart_community_db` database first.
+2. Import `database/smart_community_db.sql`. It creates the database if it does not exist, then creates the `users` and `complaints` tables and applies the complaint-table migration. It does not delete or replace an existing database or its tables.
+3. Import each stored procedure file from `database/stored_procedures/`:
+   - `sp_create_complaint.sql`
+   - `sp_get_complaints.sql`
+   - `sp_update_complaint_status.sql`
+
+The procedure scripts can be imported in any order and can be re-imported to replace the existing procedures. The application's database user needs permission to create databases, create/alter tables, and create procedures. If `smart_community_db` already contains data, back it up first; the script preserves existing tables but the foreign-key migration may fail if existing complaint user IDs do not match users.
+
+### Submit a complaint
+
+- Method and URL: `POST http://localhost:3000/api/complaints`
+- Header: `Authorization: Bearer <JWT>`
+- In Postman, choose **Body → form-data** and add text fields `title`, `category`, `location`, and `description`.
+- Add an optional field named `photo`, set its type to **File**, and choose a JPEG, PNG, GIF, or WebP image up to 5 MB.
+- Do not manually set the `Content-Type` header. Postman must generate the multipart boundary.
+
+The response includes the existing `complaintId` field, the equivalent `referenceNumber`, and `photoUrl` (`null` when no image was supplied). The uploaded image can be accessed through its returned `/uploads/...` path.
+
+### List complaints
+
+- Method and URL: `GET http://localhost:3000/api/complaints`
+- The response remains an array and includes `user_id` and `photo_url` for each record.

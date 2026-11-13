@@ -1,8 +1,14 @@
-
-# Node.js backend secrets and dependencies
+# Environment and dependencies
 .env
 node_modules/
 desktop.ini
+
+# Uploaded complaint images
+uploads/*
+!uploads/.gitkeep
+
+# Backup files
+index-backup.html
 
 # Miscellaneous
 *.class
