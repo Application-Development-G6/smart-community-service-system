@@ -19,15 +19,27 @@ class ComplaintsApiException implements Exception {
 class ComplaintsApi {
   static final http.Client _client = http.Client();
 
-  static Future<List<Map<String, dynamic>>> getComplaints() async {
+  static Future<List<Map<String, dynamic>>> getComplaints() {
+    return _getComplaints('complaints');
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminComplaints() {
+    return _getComplaints('complaints/admin');
+  }
+
+  static Future<List<Map<String, dynamic>>> _getComplaints(
+    String endpoint,
+  ) async {
     final response = await _client
-        .get(ApiConfig.endpoint('complaints'), headers: _authorizedHeaders())
+        .get(ApiConfig.endpoint(endpoint), headers: _authorizedHeaders())
         .timeout(const Duration(seconds: 15));
     final body = _decodeResponse(response);
     _ensureSuccess(response, body, 'Failed to retrieve complaints.');
 
     if (body is! List) {
-      throw const FormatException('The API returned an invalid complaint list.');
+      throw const FormatException(
+        'The API returned an invalid complaint list.',
+      );
     }
     return body.map((item) {
       if (item is! Map<String, dynamic>) {
@@ -74,7 +86,9 @@ class ComplaintsApi {
     final body = _decodeResponse(response);
     _ensureSuccess(response, body, 'Failed to submit complaint.');
     if (body is! Map<String, dynamic>) {
-      throw const FormatException('The API returned an invalid submission response.');
+      throw const FormatException(
+        'The API returned an invalid submission response.',
+      );
     }
     return body;
   }
@@ -82,6 +96,7 @@ class ComplaintsApi {
   static Future<void> updateStatus({
     required int complaintId,
     required String status,
+    String? remark,
   }) async {
     final response = await _client
         .patch(
@@ -90,7 +105,7 @@ class ComplaintsApi {
             ..._authorizedHeaders(),
             'Content-Type': 'application/json',
           },
-          body: jsonEncode({'status': status}),
+          body: jsonEncode({'status': status, 'remark': remark}),
         )
         .timeout(const Duration(seconds: 15));
     final body = _decodeResponse(response);
@@ -113,7 +128,19 @@ class ComplaintsApi {
     if (response.bodyBytes.isEmpty) {
       return <String, dynamic>{};
     }
-    return jsonDecode(utf8.decode(response.bodyBytes));
+    final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+    if (!contentType.contains('application/json')) {
+      throw ComplaintsApiException(
+        'The API returned a non-JSON response (HTTP ${response.statusCode}). '
+        'Check the backend URL and restart the latest backend server.',
+      );
+    }
+
+    try {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } on FormatException catch (error) {
+      throw FormatException('The API returned invalid JSON: $error');
+    }
   }
 
   static void _ensureSuccess(

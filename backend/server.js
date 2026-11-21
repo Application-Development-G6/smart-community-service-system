@@ -46,6 +46,14 @@ app.use('/api/complaints', complaintRoutes);
 // Authentication API routes
 app.use('/api/auth', authRoutes);
 
+// Keep unknown API endpoints in the same JSON response format as API routes.
+app.use('/api', (req, res) => {
+    res.status(404).json({
+        success: false,
+        message: `API route ${req.method} ${req.originalUrl} was not found.`
+    });
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
