@@ -80,7 +80,17 @@ async function createComplaint(req, res) {
 // Handle retrieving complaints
 async function getComplaints(req, res) {
     try {
-        const complaints = await complaintModel.getComplaints();
+        const userId = Number(req.user && req.user.id);
+        if (!Number.isSafeInteger(userId) || userId <= 0) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authenticated user information is missing.'
+            });
+        }
+
+        const complaints = req.user.role === 'admin'
+            ? await complaintModel.getComplaints()
+            : await complaintModel.getUserComplaints(userId);
 
         return res.json(complaints);
     } catch (err) {
@@ -93,10 +103,24 @@ async function getComplaints(req, res) {
     }
 }
 
+async function getAdminComplaints(req, res) {
+    try {
+        const complaints = await complaintModel.getComplaints();
+        return res.json(complaints);
+    } catch (err) {
+        console.error('Get admin complaints error:', err.message);
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve complaints.'
+        });
+    }
+}
+
 // Handle updating complaint status
 async function updateComplaintStatus(req, res) {
     const id = Number(req.params.id);
-    const { status } = req.body || {};
+    const { status, remark } = req.body || {};
 
     const allowedStatuses = ['Pending', 'Ongoing', 'Resolved'];
 
@@ -117,9 +141,26 @@ async function updateComplaintStatus(req, res) {
         });
     }
 
+    if (
+        remark !== undefined &&
+        remark !== null &&
+        (typeof remark !== 'string' || remark.length > 500)
+    ) {
+        return res.status(400).json({
+            success: false,
+            message: 'The admin remark must be text no longer than 500 characters.'
+        });
+    }
+
     try {
         const affectedRows =
-            await complaintModel.updateComplaintStatus(id, status);
+            await complaintModel.updateComplaintStatus(
+                id,
+                status,
+                typeof remark === 'string' && remark.trim()
+                    ? remark.trim()
+                    : null
+            );
 
         if (affectedRows === 0) {
             return res.status(404).json({
@@ -145,5 +186,6 @@ async function updateComplaintStatus(req, res) {
 module.exports = {
     createComplaint,
     getComplaints,
+    getAdminComplaints,
     updateComplaintStatus
 };

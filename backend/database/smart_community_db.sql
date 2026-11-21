@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS complaints (
     location VARCHAR(255) NOT NULL,
     photo_url VARCHAR(255) NULL,
     status ENUM('Pending', 'Ongoing', 'Resolved') NOT NULL DEFAULT 'Pending',
+    admin_remark VARCHAR(500) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_complaints_user
@@ -57,6 +58,25 @@ SET @has_photo_url = (
 SET @sql = IF(
     @has_photo_url = 0,
     'ALTER TABLE complaints ADD COLUMN photo_url VARCHAR(255) NULL AFTER location',
+    'SELECT 1'
+);
+
+PREPARE complaint_migration FROM @sql;
+EXECUTE complaint_migration;
+DEALLOCATE PREPARE complaint_migration;
+
+-- Add admin_remark if missing.
+SET @has_admin_remark = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'complaints'
+      AND COLUMN_NAME = 'admin_remark'
+);
+
+SET @sql = IF(
+    @has_admin_remark = 0,
+    'ALTER TABLE complaints ADD COLUMN admin_remark VARCHAR(500) NULL AFTER status',
     'SELECT 1'
 );
 
