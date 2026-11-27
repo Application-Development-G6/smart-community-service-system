@@ -15,6 +15,7 @@ BEGIN
         description,
         photo_url,
         status,
+        admin_remark,
         created_at
     FROM complaints
     ORDER BY created_at DESC, id DESC;

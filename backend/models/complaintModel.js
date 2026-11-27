@@ -50,12 +50,36 @@ function getComplaints() {
     });
 }
 
-// Update complaint status using a MySQL stored procedure
-function updateComplaintStatus(id, status) {
+// Retrieve complaints submitted by one resident
+function getUserComplaints(userId) {
     return new Promise((resolve, reject) => {
         db.query(
-            'CALL sp_update_complaint_status(?, ?)',
-            [id, status],
+            'CALL sp_get_user_complaints(?)',
+            [userId],
+            (err, results) => {
+                if (err) {
+                    return reject(err);
+                }
+
+                const complaints = findProcedureRows(results, 'id');
+                if (!complaints) {
+                    return reject(
+                        new Error('The get user complaints procedure returned no result set.')
+                    );
+                }
+
+                resolve(complaints);
+            }
+        );
+    });
+}
+
+// Update complaint status using a MySQL stored procedure
+function updateComplaintStatus(id, status, remark) {
+    return new Promise((resolve, reject) => {
+        db.query(
+            'CALL sp_update_complaint_status(?, ?, ?)',
+            [id, status, remark],
             (err, results) => {
                 if (err) {
                     return reject(err);
@@ -79,5 +103,6 @@ function updateComplaintStatus(id, status) {
 module.exports = {
     createComplaint,
     getComplaints,
+    getUserComplaints,
     updateComplaintStatus
 };

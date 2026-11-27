@@ -15,14 +15,22 @@ router.post(
     complaintController.createComplaint
 );
 
-// Retrieve all complaints (requires authentication)
+// Residents retrieve their own complaints; admins retrieve all complaints.
 router.get(
     '/',
     verifyToken,
     complaintController.getComplaints
 );
 
-// Update a complaint's status (requires authentication)
+// Retrieve all complaints for the admin dashboard
+router.get(
+    '/admin',
+    verifyToken,
+    verifyAdmin,
+    complaintController.getAdminComplaints
+);
+
+// Update a complaint's status (requires an admin account)
 router.patch(
     '/:id/status',
     verifyToken,
